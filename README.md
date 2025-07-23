@@ -23,121 +23,135 @@
 
 # Recipe API
 
-A RESTful API for managing cooking recipes built with NestJS and MongoDB.
+A modern, feature-rich RESTful API for managing cooking recipes built with NestJS and MongoDB [[memory:4109437]]. This API provides comprehensive functionality for creating, managing, and searching recipes with advanced filtering and pagination capabilities.
 
 ## Features
 
-- Create, read, update, and delete recipes
-- Advanced filtering and sorting
-- Pagination support
-- Swagger API documentation
-- Docker support
-- MongoDB database
+- Full CRUD operations for recipes (Create, Read, Update, Delete)
+- Advanced search capabilities:
+  - Regular text search by recipe name
+  - Full-text search across name, ingredients, and instructions
+  - Filtering by difficulty level and preparation time
+- Flexible sorting options for any recipe field
+- Pagination support with customizable page size
+- Swagger/OpenAPI documentation
+- Docker containerization
+- MongoDB integration
+- Input validation and error handling
+- Comprehensive API response documentation
 
 ## Prerequisites
 
 - Node.js (v18 or later)
 - MongoDB (v6 or later)
-- Docker and Docker Compose (optional)
+- Docker and Docker Compose (optional, for containerized deployment)
 
 ## Installation
 
 ```bash
+# Install dependencies
 npm install
+
+# Create environment file
+echo "MONGODB_URI=mongodb://localhost:27017/recipe_db" > .env
 ```
 
 ## Running the Application
 
-### Using Docker
+### Using Docker (Recommended)
 
 ```bash
+# Start both API and MongoDB services
 docker-compose up
 ```
 
-This will start both the API and MongoDB services. The API will be available at http://localhost:3000.
+The API will be available at http://localhost:3000.
 
 ### Local Development
 
-1. Make sure MongoDB is running locally on port 27017
-2. Create a `.env` file with the following content:
-   ```
-   MONGODB_URI=mongodb://localhost:27017/recipe_db
-   ```
-3. Start the application:
+1. Ensure MongoDB is running locally on port 27017
+2. Start the application in development mode:
    ```bash
    npm run start:dev
    ```
 
 ## API Documentation
 
-Once the application is running, visit http://localhost:3000/api to access the Swagger documentation.
+Swagger documentation is available at http://localhost:3000/api when the application is running.
 
 ## API Endpoints
 
-- `POST /recipes` - Create a new recipe
-- `GET /recipes` - Get all recipes (with pagination, filtering, and sorting)
-- `GET /recipes/:id` - Get a specific recipe
-- `PATCH /recipes/:id` - Update a recipe
-- `DELETE /recipes/:id` - Delete a recipe
+### Create Recipe
+- **POST** `/recipes`
+- Creates a new recipe
+- Required fields:
+  - `name` (string): Recipe name
+  - `ingredients` (string[]): List of ingredients
+  - `instructions` (string): Step-by-step instructions
+  - `prepTime` (number): Preparation time in minutes
+  - `cookTime` (number): Cooking time in minutes
+  - `servings` (number): Number of servings
+- Optional fields:
+  - `difficulty` (enum): 'easy', 'medium', or 'hard'
 
-### Query Parameters for GET /recipes
+### Get Recipes
+- **GET** `/recipes`
+- Retrieves a paginated list of recipes with filtering options
+- Query Parameters:
+  - `page` (number, default: 1): Page number
+  - `limit` (number, default: 10): Items per page
+  - `search` (string): Search recipes by name
+  - `textSearch` (string): Full-text search across name, ingredients, and instructions
+  - `difficulty` (string): Filter by difficulty level
+  - `maxPrepTime` (number): Filter by maximum preparation time
+  - `sortBy` (string, default: 'createdAt'): Field to sort by
+  - `sortOrder` (enum, default: 'DESC'): Sort order ('ASC' or 'DESC')
 
-- `page` - Page number (default: 1)
-- `limit` - Items per page (default: 10)
-- `search` - Search recipes by name
-- `difficulty` - Filter by difficulty level
-- `sortBy` - Sort by field (default: createdAt)
-- `sortOrder` - Sort order (ASC or DESC, default: DESC)
-- `maxPrepTime` - Filter by maximum preparation time
+### Get Single Recipe
+- **GET** `/recipes/:id`
+- Retrieves a specific recipe by ID
+- Returns 404 if recipe not found
+
+### Update Recipe
+- **PATCH** `/recipes/:id`
+- Updates an existing recipe
+- Supports partial updates
+- Returns 404 if recipe not found
+
+### Delete Recipe
+- **DELETE** `/recipes/:id`
+- Deletes a recipe
+- Returns 204 on success
+- Returns 404 if recipe not found
 
 ## Testing
 
 ```bash
-# unit tests
+# Run unit tests
 npm run test
 
-# e2e tests
+# Run end-to-end tests
 npm run test:e2e
 ```
 
-## Deployment
+## Error Handling
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+The API implements standard HTTP status codes:
+- 200: Successful GET/PATCH requests
+- 201: Successful POST requests
+- 204: Successful DELETE requests
+- 400: Bad Request (invalid input)
+- 404: Resource Not Found
+- 500: Internal Server Error
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Contributing
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-# recipe-curd
-# recipe-curd
+This project is licensed under the MIT License - see the LICENSE file for details.
