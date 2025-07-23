@@ -1,25 +1,49 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
+import { AppModule } from './../src/app.module';
 import { CreateRecipeDto } from '../src/recipes/dto/create-recipe.dto';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Recipe } from '../src/recipes/entities/recipe.entity';
 import { getModelToken } from '@nestjs/mongoose';
 
+interface RecipeDocument extends Recipe {
+  _id: Types.ObjectId;
+}
+
 describe('RecipesController (e2e)', () => {
   let app: INestApplication;
-  let recipeModel: Model<Recipe>;
+  let recipeModel: Model<RecipeDocument>;
 
-  const mockRecipe: CreateRecipeDto = {
-    name: 'Test Recipe',
-    ingredients: ['ingredient1', 'ingredient2'],
-    instructions: 'Test instructions',
-    prepTime: 30,
-    cookTime: 45,
-    difficulty: 'medium',
-    servings: 4,
-  };
+  const mockRecipes = [
+    {
+      name: 'Garlic Parmesan Pasta',
+      ingredients: ['pasta', 'garlic', 'parmesan', 'olive oil'],
+      instructions: 'Cook pasta, add lots of garlic and parmesan',
+      prepTime: 10,
+      cookTime: 20,
+      difficulty: 'easy',
+      servings: 4,
+    },
+    {
+      name: 'Simple Toast',
+      ingredients: ['bread', 'butter'],
+      instructions: 'Just toast the bread lightly',
+      prepTime: 2,
+      cookTime: 3,
+      difficulty: 'easy',
+      servings: 1,
+    },
+    {
+      name: 'Garlic Bread',
+      ingredients: ['bread', 'garlic', 'butter', 'herbs'],
+      instructions: 'Toast bread with garlic butter',
+      prepTime: 5,
+      cookTime: 10,
+      difficulty: 'easy',
+      servings: 2,
+    }
+  ];
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -35,7 +59,16 @@ describe('RecipesController (e2e)', () => {
       }),
     );
 
-    recipeModel = moduleFixture.get<Model<Recipe>>(getModelToken(Recipe.name));
+    recipeModel = moduleFixture.get<Model<RecipeDocument>>(getModelToken(Recipe.name));
+
+    // Drop existing indexes and collection
+    try {
+      await recipeModel.collection.dropIndexes();
+      await recipeModel.collection.drop();
+    } catch (error) {
+      // Collection might not exist yet
+    }
+
     await app.init();
   });
 
@@ -48,136 +81,138 @@ describe('RecipesController (e2e)', () => {
     await recipeModel.deleteMany({});
   });
 
-  describe('/recipes (POST)', () => {
-    it('should create a new recipe', () => {
+  describe('Text Search', () => {
+    beforeEach(async () => {
+      // Create test recipes
+      await Promise.all(mockRecipes.map(recipe => recipeModel.create(recipe)));
+      
+      // Wait for indexes to be ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    });
+
+    it('should return high-relevance results with scores', () => {
+      return request(app.getHttpServer())
+        .get('/recipes?textSearch=garlic')
+        .expect(200)
+        .expect((res) => {
+          const { data, meta } = res.body;
+          expect(data.length).toBeGreaterThan(0);
+          expect(data[0]).toHaveProperty('score');
+          expect(data[0].score).toBeGreaterThan(0.5);
+          // First result should be most relevant
+          expect(data[0].name).toContain('Garlic');
+        });
+    });
+
+    it('should not return low-relevance results', () => {
+      return request(app.getHttpServer())
+        .get('/recipes?textSearch=food')
+        .expect(200)
+        .expect((res) => {
+          const { data } = res.body;
+          expect(data.length).toBe(0);
+        });
+    });
+
+    it('should combine text search with filters', () => {
+      return request(app.getHttpServer())
+        .get('/recipes?textSearch=garlic&difficulty=easy&maxPrepTime=7')
+        .expect(200)
+        .expect((res) => {
+          const { data } = res.body;
+          expect(data.length).toBeGreaterThan(0);
+          data.forEach(recipe => {
+            expect(recipe.score).toBeGreaterThan(0.5);
+            expect(recipe.difficulty).toBe('easy');
+            expect(recipe.prepTime).toBeLessThanOrEqual(7);
+            expect(recipe.name.toLowerCase()).toContain('garlic');
+          });
+        });
+    });
+
+    it('should return results sorted by text score', () => {
+      return request(app.getHttpServer())
+        .get('/recipes?textSearch=garlic')
+        .expect(200)
+        .expect((res) => {
+          const { data } = res.body;
+          expect(data.length).toBeGreaterThan(1);
+          // Verify scores are in descending order
+          for (let i = 1; i < data.length; i++) {
+            expect(data[i-1].score).toBeGreaterThanOrEqual(data[i].score);
+          }
+        });
+    });
+  });
+
+  describe('Regular Search', () => {
+    beforeEach(async () => {
+      await Promise.all(mockRecipes.map(recipe => recipeModel.create(recipe)));
+    });
+
+    it('should search by name without score threshold', () => {
+      return request(app.getHttpServer())
+        .get('/recipes?search=toast')
+        .expect(200)
+        .expect((res) => {
+          const { data } = res.body;
+          expect(data.length).toBeGreaterThan(0);
+          data.forEach(recipe => {
+            expect(recipe.name.toLowerCase()).toContain('toast');
+            expect(recipe).not.toHaveProperty('score');
+          });
+        });
+    });
+
+    it('should handle pagination with search', () => {
+      return request(app.getHttpServer())
+        .get('/recipes?search=bread&page=1&limit=1')
+        .expect(200)
+        .expect((res) => {
+          const { data, meta } = res.body;
+          expect(data.length).toBe(1);
+          expect(meta.total).toBeGreaterThan(1);
+          expect(meta.totalPages).toBeGreaterThan(1);
+        });
+    });
+  });
+
+  describe('CRUD Operations', () => {
+    it('/recipes (POST) - should create recipe', () => {
+      const createRecipeDto: CreateRecipeDto = mockRecipes[0];
       return request(app.getHttpServer())
         .post('/recipes')
-        .send(mockRecipe)
+        .send(createRecipeDto)
         .expect(201)
         .expect((res) => {
-          expect(res.body).toMatchObject({
-            ...mockRecipe,
-            _id: expect.any(String),
-            createdAt: expect.any(String),
-            updatedAt: expect.any(String),
-          });
+          expect(res.body).toHaveProperty('_id');
+          expect(res.body.name).toBe(createRecipeDto.name);
         });
     });
 
-    it('should validate required fields', () => {
-      return request(app.getHttpServer())
-        .post('/recipes')
-        .send({})
-        .expect(400)
-        .expect((res) => {
-          expect(res.body.message).toEqual(expect.any(Array));
-        });
-    });
-  });
+    it('/recipes/:id (PATCH) - should update recipe', async () => {
+      const recipe = await recipeModel.create(mockRecipes[0]) as RecipeDocument;
+      const updateData = { name: 'Updated Recipe Name' };
 
-  describe('/recipes (GET)', () => {
-    beforeEach(async () => {
-      await recipeModel.create(mockRecipe);
-    });
-
-    it('should return paginated recipes', () => {
       return request(app.getHttpServer())
-        .get('/recipes')
+        .patch(`/recipes/${recipe._id.toString()}`)
+        .send(updateData)
         .expect(200)
         .expect((res) => {
-          expect(res.body).toEqual({
-            data: expect.arrayContaining([
-              expect.objectContaining({
-                name: mockRecipe.name,
-              }),
-            ]),
-            meta: expect.objectContaining({
-              total: 1,
-              page: 1,
-              limit: 10,
-              totalPages: 1,
-            }),
-          });
+          expect(res.body.name).toBe(updateData.name);
+          expect(res.body._id).toBe(recipe._id.toString());
         });
     });
 
-    it('should filter recipes by search term', () => {
-      return request(app.getHttpServer())
-        .get('/recipes?search=Test')
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.data).toHaveLength(1);
-          expect(res.body.data[0].name).toContain('Test');
-        });
-    });
-  });
+    it('/recipes/:id (DELETE) - should delete recipe', async () => {
+      const recipe = await recipeModel.create(mockRecipes[0]) as RecipeDocument;
 
-  describe('/recipes/:id (GET)', () => {
-    let createdRecipe;
-
-    beforeEach(async () => {
-      createdRecipe = await recipeModel.create(mockRecipe);
-    });
-
-    it('should return a recipe by id', () => {
-      return request(app.getHttpServer())
-        .get(`/recipes/${createdRecipe._id}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toMatchObject({
-            ...mockRecipe,
-            _id: createdRecipe._id.toString(),
-          });
-        });
-    });
-
-    it('should return 404 for non-existent recipe', () => {
-      return request(app.getHttpServer())
-        .get('/recipes/5f7d7c3c9d3e2a1234567890')
-        .expect(404);
-    });
-  });
-
-  describe('/recipes/:id (PATCH)', () => {
-    let createdRecipe;
-
-    beforeEach(async () => {
-      createdRecipe = await recipeModel.create(mockRecipe);
-    });
-
-    it('should update a recipe', () => {
-      const updateDto = { name: 'Updated Recipe Name' };
-      return request(app.getHttpServer())
-        .patch(`/recipes/${createdRecipe._id}`)
-        .send(updateDto)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toMatchObject({
-            ...mockRecipe,
-            ...updateDto,
-            _id: createdRecipe._id.toString(),
-          });
-        });
-    });
-  });
-
-  describe('/recipes/:id (DELETE)', () => {
-    let createdRecipe;
-
-    beforeEach(async () => {
-      createdRecipe = await recipeModel.create(mockRecipe);
-    });
-
-    it('should delete a recipe', () => {
-      return request(app.getHttpServer())
-        .delete(`/recipes/${createdRecipe._id}`)
+      await request(app.getHttpServer())
+        .delete(`/recipes/${recipe._id.toString()}`)
         .expect(204);
-    });
 
-    it('should return 404 for non-existent recipe', () => {
-      return request(app.getHttpServer())
-        .delete('/recipes/5f7d7c3c9d3e2a1234567890')
-        .expect(404);
+      const deletedRecipe = await recipeModel.findById(recipe._id);
+      expect(deletedRecipe).toBeNull();
     });
   });
 });

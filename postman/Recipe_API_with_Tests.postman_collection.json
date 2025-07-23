@@ -1,0 +1,310 @@
+{
+  "info": {
+    "name": "Recipe API Tests",
+    "description": "Test suite for Recipe API including full-text search with relevance threshold",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Test Recipes",
+      "item": [
+        {
+          "name": "Create Pasta Recipe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const responseData = pm.response.json();",
+                  "pm.collectionVariables.set('pastaRecipeId', responseData._id);",
+                  "",
+                  "pm.test('Recipe created successfully', function () {",
+                  "    pm.expect(responseData.name).to.eql('Garlic Parmesan Pasta');",
+                  "    pm.expect(responseData.ingredients).to.include('garlic');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Garlic Parmesan Pasta\",\n    \"ingredients\": [\n        \"pasta\",\n        \"garlic\",\n        \"parmesan cheese\",\n        \"olive oil\",\n        \"black pepper\"\n    ],\n    \"instructions\": \"1. Cook pasta in salted water\\n2. Sauté minced garlic in olive oil\\n3. Toss pasta with garlic oil\\n4. Add grated parmesan\",\n    \"prepTime\": 10,\n    \"cookTime\": 20,\n    \"difficulty\": \"easy\",\n    \"servings\": 4\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recipes",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes"]
+            }
+          }
+        },
+        {
+          "name": "Create Chicken Recipe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const responseData = pm.response.json();",
+                  "pm.collectionVariables.set('chickenRecipeId', responseData._id);",
+                  "",
+                  "pm.test('Recipe created successfully', function () {",
+                  "    pm.expect(responseData.name).to.eql('Garlic Butter Chicken');",
+                  "    pm.expect(responseData.ingredients).to.include('chicken');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Garlic Butter Chicken\",\n    \"ingredients\": [\n        \"chicken breast\",\n        \"garlic\",\n        \"butter\",\n        \"herbs\",\n        \"salt\"\n    ],\n    \"instructions\": \"1. Season chicken with salt\\n2. Cook chicken in butter\\n3. Add minced garlic\\n4. Finish with herbs\",\n    \"prepTime\": 15,\n    \"cookTime\": 25,\n    \"difficulty\": \"medium\",\n    \"servings\": 4\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recipes",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search Tests",
+      "item": [
+        {
+          "name": "Regular Search",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const responseData = pm.response.json();",
+                  "",
+                  "pm.test('Search returns correct results', function () {",
+                  "    pm.expect(responseData.data).to.be.an('array');",
+                  "    pm.expect(responseData.data[0].name).to.include('Pasta');",
+                  "});",
+                  "",
+                  "pm.test('Pagination metadata is correct', function () {",
+                  "    pm.expect(responseData.meta).to.have.property('total');",
+                  "    pm.expect(responseData.meta).to.have.property('page');",
+                  "    pm.expect(responseData.meta.page).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/recipes?search=pasta",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "pasta"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Full-Text Search (High Relevance)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const responseData = pm.response.json();",
+                  "",
+                  "pm.test('Text search returns relevant results', function () {",
+                  "    pm.expect(responseData.data).to.be.an('array');",
+                  "    pm.expect(responseData.data.length).to.be.at.least(1);",
+                  "    const allRelevant = responseData.data.every(recipe => ",
+                  "        recipe.name.toLowerCase().includes('garlic') || ",
+                  "        recipe.ingredients.some(i => i.toLowerCase().includes('garlic')) || ",
+                  "        recipe.instructions.toLowerCase().includes('garlic')",
+                  "    );",
+                  "    pm.expect(allRelevant).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Results are sorted by relevance', function () {",
+                  "    pm.expect(responseData.data[0]).to.have.property('score');",
+                  "    pm.expect(responseData.data[0].score).to.be.above(0.5);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/recipes?textSearch=garlic",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes"],
+              "query": [
+                {
+                  "key": "textSearch",
+                  "value": "garlic"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Full-Text Search (Low Relevance)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const responseData = pm.response.json();",
+                  "",
+                  "pm.test('Low relevance search returns empty results', function () {",
+                  "    pm.expect(responseData.data).to.be.an('array');",
+                  "    pm.expect(responseData.data.length).to.equal(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/recipes?textSearch=unrelated",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes"],
+              "query": [
+                {
+                  "key": "textSearch",
+                  "value": "unrelated"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cleanup",
+      "item": [
+        {
+          "name": "Delete Pasta Recipe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{pastaRecipeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes", "{{pastaRecipeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Chicken Recipe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{chickenRecipeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes", "{{chickenRecipeId}}"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "pastaRecipeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "chickenRecipeId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+} 

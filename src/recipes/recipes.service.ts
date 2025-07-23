@@ -8,6 +8,8 @@ import { QueryRecipeDto } from './dto/query-recipe.dto';
 
 @Injectable()
 export class RecipesService {
+  private readonly TEXT_SCORE_THRESHOLD = 0.5;
+
   constructor(
     @InjectModel(Recipe.name)
     private readonly recipeModel: Model<Recipe>,
@@ -27,59 +29,87 @@ export class RecipesService {
   }
 
   async findAll(queryDto: QueryRecipeDto) {
-    // Destructure query parameters with default values
     const {
-      page = 1, // Default to first page
-      limit = 10, // Default to 10 items per page
-      search, // Search term for recipe name
-      difficulty, // Filter by difficulty level
-      sortBy = 'createdAt', // Default sort by creation date
-      sortOrder = 'DESC', // Default sort order
-      maxPrepTime, // Filter by maximum preparation time
+      page = 1,
+      limit = 10,
+      search,
+      textSearch,
+      difficulty,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      maxPrepTime,
     } = queryDto;
 
-    // Calculate skip value for pagination
     const skip = (page - 1) * limit;
-
-    // Build the query using Mongoose's query builder
     const query = this.recipeModel.find();
 
-    // Apply search filter if search term is provided
-    if (search) {
-      // Case-insensitive search on recipe name using regex
+    // Apply text search if provided
+    if (textSearch) {
+      // Add text search query
+      query.where({ $text: { $search: textSearch } });
+
+      // Add score field and projection
+      const projection = {
+        score: { $meta: 'textScore' },
+        name: 1,
+        ingredients: 1,
+        instructions: 1,
+        prepTime: 1,
+        cookTime: 1,
+        difficulty: 1,
+        servings: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        _id: 1,
+      };
+
+      query.select(projection);
+
+      // Sort by text score
+      query.sort({ score: { $meta: 'textScore' } });
+
+      // Add score threshold using aggregation
+      query.where({ score: { $gt: this.TEXT_SCORE_THRESHOLD } });
+    }
+    // Apply regular search if no text search is provided
+    else if (search) {
       query.where('name', new RegExp(search, 'i'));
     }
 
-    // Apply difficulty filter if specified
     if (difficulty) {
-      // Exact match on difficulty level
       query.where('difficulty', difficulty);
     }
 
-    // Apply maxPrepTime filter if specified
     if (maxPrepTime) {
-      // Less than or equal to specified prep time
       query.where('prepTime').lte(maxPrepTime);
     }
 
-    // Execute count query for total number of matching documents
-    const total = await this.recipeModel.countDocuments(query.getQuery());
+    // Apply default sorting if not using text search
+    if (!textSearch) {
+      query.sort({ [sortBy]: sortOrder === 'DESC' ? -1 : 1 });
+    }
 
-    // Apply sorting and pagination
-    const recipes = await query
-      .sort({ [sortBy]: sortOrder === 'DESC' ? -1 : 1 }) // Dynamic sorting
-      .skip(skip) // Skip records for pagination
-      .limit(limit) // Limit number of records
-      .exec();
+    // Debug: Log the query
+    console.log('MongoDB Query:', query.getQuery());
+    console.log('MongoDB Sort:', query.getOptions().sort);
+    console.log('MongoDB Select:', query.getOptions().select);
 
-    // Return paginated result with metadata
+    // Execute query with pagination
+    const [recipes, total] = await Promise.all([
+      query.skip(skip).limit(limit).exec(),
+      this.recipeModel.countDocuments(query.getQuery()),
+    ]);
+
+    // Debug: Log the results
+    console.log('Query Results:', recipes);
+
     return {
       data: recipes,
       meta: {
-        total, // Total number of matching records
-        page, // Current page number
-        limit, // Items per page
-        totalPages: Math.ceil(total / limit), // Calculate total pages
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
     };
   }

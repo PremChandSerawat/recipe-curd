@@ -22,10 +22,22 @@ export class QueryRecipeDto {
   @IsOptional()
   limit?: number = 10;
 
-  @ApiProperty({ required: false, description: 'Search term for recipe name' })
+  @ApiProperty({
+    required: false,
+    description: 'Regular search term for recipe name',
+  })
   @IsString()
   @IsOptional()
   search?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Full-text search across name, ingredients, and instructions (minimum relevance score: 0.5)',
+  })
+  @IsString()
+  @IsOptional()
+  textSearch?: string;
 
   @ApiProperty({ required: false, description: 'Filter by difficulty level' })
   @IsString()

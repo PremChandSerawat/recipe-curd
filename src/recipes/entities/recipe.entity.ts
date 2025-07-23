@@ -1,8 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, HydratedDocument } from 'mongoose';
+import { Document } from 'mongoose';
 import { ApiProperty } from '@nestjs/swagger';
-
-export type RecipeDocument = HydratedDocument<Recipe>;
 
 @Schema({ timestamps: true })
 export class Recipe extends Document {
@@ -36,3 +34,20 @@ export class Recipe extends Document {
 }
 
 export const RecipeSchema = SchemaFactory.createForClass(Recipe);
+
+// Configure text index with weights
+RecipeSchema.index(
+  {
+    name: 'text',
+    ingredients: 'text',
+    instructions: 'text',
+  },
+  {
+    weights: {
+      name: 10,
+      ingredients: 5,
+      instructions: 1,
+    },
+    name: 'recipe_text_search',
+  },
+);

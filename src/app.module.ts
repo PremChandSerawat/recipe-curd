@@ -22,6 +22,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
           'MONGODB_URI',
           'mongodb://localhost:27017/recipe_db',
         ),
+        autoIndex: true, // Ensure indexes are created
       }),
       inject: [ConfigService],
     }),
