@@ -17,11 +17,11 @@ export class Recipe extends Document {
   instructions: string;
 
   @ApiProperty({ description: 'Preparation time in minutes' })
-  @Prop({ required: true })
+  @Prop({ required: false })
   prepTime: number;
 
   @ApiProperty({ description: 'Cooking time in minutes' })
-  @Prop({ required: true })
+  @Prop({ required: false })
   cookTime: number;
 
   @ApiProperty({ description: 'Difficulty level of the recipe' })
@@ -29,7 +29,7 @@ export class Recipe extends Document {
   difficulty: string;
 
   @ApiProperty({ description: 'Number of servings' })
-  @Prop({ required: true })
+  @Prop({ required: false })
   servings: number;
 }
 

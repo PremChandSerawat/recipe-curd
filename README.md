@@ -36,9 +36,19 @@ A modern, feature-rich RESTful API for managing cooking recipes built with NestJ
 - Pagination support with customizable page size
 - Swagger/OpenAPI documentation
 - Docker containerization
-- MongoDB integration
+- MongoDB integration with text indexing
 - Input validation and error handling
 - Comprehensive API response documentation
+- Custom logging system:
+  - Configurable file-based logging
+  - Timestamp and context-based log formatting
+  - Multiple log levels (INFO, ERROR, WARN, DEBUG, VERBOSE)
+  - Request logging middleware
+- Extensive test coverage:
+  - Unit tests
+  - Integration tests
+  - E2E tests with MongoDB
+  - Postman collections for API testing
 
 ## Prerequisites
 
@@ -53,7 +63,10 @@ A modern, feature-rich RESTful API for managing cooking recipes built with NestJ
 npm install
 
 # Create environment file
-echo "MONGODB_URI=mongodb://localhost:27017/recipe_db" > .env
+cat << EOF > .env
+MONGODB_URI=mongodb://localhost:27017/recipe_db
+LOG_TO_FILE=false
+EOF
 ```
 
 ## Running the Application
@@ -100,12 +113,18 @@ Swagger documentation is available at http://localhost:3000/api when the applica
 - Query Parameters:
   - `page` (number, default: 1): Page number
   - `limit` (number, default: 10): Items per page
-  - `search` (string): Search recipes by name
+  - `search` (string): Regular search by recipe name (case-insensitive)
   - `textSearch` (string): Full-text search across name, ingredients, and instructions
   - `difficulty` (string): Filter by difficulty level
   - `maxPrepTime` (number): Filter by maximum preparation time
   - `sortBy` (string, default: 'createdAt'): Field to sort by
   - `sortOrder` (enum, default: 'DESC'): Sort order ('ASC' or 'DESC')
+- Response includes:
+  - Recipe data
+  - Total count
+  - Current page
+  - Total pages
+  - For text search: relevance score (minimum threshold: 0.5)
 
 ### Get Single Recipe
 - **GET** `/recipes/:id`
@@ -132,7 +151,15 @@ npm run test
 
 # Run end-to-end tests
 npm run test:e2e
+
+# Run test coverage
+npm run test:cov
 ```
+
+### Postman Collections
+The project includes two Postman collections in the `postman` directory:
+- `Recipe_API.postman_collection.json`: Basic API testing
+- `Recipe_API_with_Tests.postman_collection.json`: Advanced tests including text search
 
 ## Error Handling
 
@@ -143,6 +170,15 @@ The API implements standard HTTP status codes:
 - 400: Bad Request (invalid input)
 - 404: Resource Not Found
 - 500: Internal Server Error
+
+## Logging
+
+The application includes a custom logging system with the following features:
+- Configurable file-based logging (enabled via LOG_TO_FILE environment variable)
+- Daily log rotation with date-based filenames
+- Log levels: INFO, ERROR, WARN, DEBUG, VERBOSE
+- Request logging middleware for all API endpoints
+- Structured log format with timestamp and context
 
 ## Contributing
 
